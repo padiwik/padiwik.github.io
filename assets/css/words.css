@@ -5,3 +5,12 @@
 .tablelink {
 	text-decoration: underline;
 }
+
+.col-4 {
+	position: absolute;
+	left: 50%;
+}
+
+input[type=number]{
+	width: 40px;
+}

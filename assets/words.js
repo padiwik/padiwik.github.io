@@ -1,7 +1,12 @@
+/* eslint-disable prefer-destructuring */
 const guessInput = document.getElementById('guess');
 const guessType = document.getElementById('guessType');
 const guessLabel = document.getElementById('guessLabel');
 const guessLink = document.getElementById('guessLink');
+const minInput = document.getElementById('min');
+const maxInput = document.getElementById('max');
+const lenInput = document.getElementById('len'); // exact length
+const clearLenButton = document.getElementById('lenButton');
 
 const processError = 'Could not process query.';
 
@@ -10,24 +15,59 @@ const onelook = {
   label: document.getElementById('onelookLabel'),
   link: document.getElementById('onelookLink'),
   isValidText: (text) => text.match(/^[?#@*a-zA-Z() ]+$/),
+  baseURL: 'https://onelook.com/?ssbp=1&w=',
   name: 'Onelook',
 };
 const qat = {
   input: document.getElementById('qat'),
   label: document.getElementById('qatLabel'),
   link: document.getElementById('qatLink'),
-  isValidText: (text) => text.match(/^[.#@*a-z()/[\]]+$/),
+  isValidText: (text) => text.match(/^((\d*)-(\d*):|(\d+):)?([.#@*a-z()/[\]]+)$/),
+  baseURL: 'https://www.quinapalus.com/cgi-bin/qat?pat=',
   name: 'Qat',
 };
 const nutrimatic = {
   input: document.getElementById('nutrimatic'),
   label: document.getElementById('nutrimaticLabel'),
   link: document.getElementById('nutrimaticLink'),
-  isValidText: (text) => text.match(/^[ACV*a-z()<>[\] ]+$/),
+  isValidText: (text) => text.match(/^(A{(\d*),(\d*)}&|A{(\d+)}&)?([ACV*a-z()<>[\] ]+)$/),
+  baseURL: 'https://nutrimatic.org/?q=',
   name: 'Nutrimatic',
 };
 
 const engines = [onelook, qat, nutrimatic];
+
+function setLink(engine) {
+  engine.link.href = `${engine.baseURL}${encodeURIComponent(engine.input.value)}`;
+}
+
+function setInput(engine, text) {
+  engine.input.value = text;
+  setLink(engine);
+}
+
+// Returns min, max, exact length, and raw text parsed from a Qat query
+function captureQatText(inputText) {
+  const text = inputText || qat.input.value;
+  // isValidText is implemented with the regex
+  const matches = qat.isValidText(text) || [null] * 6;
+  const min = parseInt(matches[2], 10) || null;
+  const max = parseInt(matches[3], 10) || null;
+  const len = parseInt(matches[4], 10) || null;
+  const rawText = matches[5] || '';
+  return [min, max, len, rawText];
+}
+
+function captureNutrimaticText(inputText) {
+  const text = inputText || nutrimatic.input.value;
+  // isValidText is implemented with the regex
+  const matches = nutrimatic.isValidText(text) || [null] * 6;
+  const min = parseInt(matches[2], 10) || null;
+  const max = parseInt(matches[3], 10) || null;
+  const len = parseInt(matches[4], 10) || null;
+  const rawText = matches[5] || '';
+  return [min, max, len, rawText];
+}
 
 // Set the public-facing value for the engine in Guess
 function setGuessType(engineText) {
@@ -71,6 +111,61 @@ function setLabelsVisible(isVisible) {
   });
 }
 
+function handleLengthRangeRules(min, max) {
+  const [,,, rawQatText] = captureQatText();
+  const [,,, rawNutrimaticText] = captureNutrimaticText();
+  let newQatText;
+  let newNutrimaticText;
+  if (min || max) {
+    newQatText = `${min || ''}-${max || ''}:${rawQatText}`;
+    newNutrimaticText = `A{${min || ''},${max || ''}}&${rawNutrimaticText}`;
+  } else {
+    newQatText = rawQatText;
+    newNutrimaticText = rawNutrimaticText;
+  }
+  minInput.value = min;
+  maxInput.value = max;
+  setInput(qat, newQatText);
+  setInput(nutrimatic, newNutrimaticText);
+}
+
+function handleLengthRangeInputs() {
+  const min = minInput.value;
+  const max = maxInput.value;
+  handleLengthRangeRules(min, max);
+}
+
+function handleExactLengthRules(len) {
+  const [,,, rawQatText] = captureQatText();
+  const [,,, rawNutrimaticText] = captureNutrimaticText();
+  let newQatText;
+  let newNutrimaticText;
+  if (len) {
+    newQatText = `${len}:${rawQatText}`;
+    newNutrimaticText = `A{${len}}&${rawNutrimaticText}`;
+  } else {
+    newQatText = rawQatText;
+    newNutrimaticText = rawNutrimaticText;
+  }
+  lenInput.value = len;
+  setInput(qat, newQatText);
+  setInput(nutrimatic, newNutrimaticText);
+}
+
+function handleExactLengthInput() {
+  const len = lenInput.value;
+  handleExactLengthRules(len);
+}
+
+// Set the correct length input boxes
+function handleLengthRules(min, max, len) {
+  if (len) {
+    handleExactLengthRules(len);
+  } else {
+    handleLengthRangeRules(min, max);
+  }
+}
+
 function processText(text, engine) {
   let onelookText = '';
   let qatText = '';
@@ -81,8 +176,15 @@ function processText(text, engine) {
   let anagramming = false; // true if we are currently in an anagram
   let nestedLevel; // tally of parentheses after qat anagram indicator
   let fixedText = text;
+  let min;
+  let max;
+  let len;
   if (engine === onelook) {
     fixedText = text.toLowerCase();
+  } else if (engine === qat) {
+    [min, max, len, fixedText] = captureQatText(text);
+  } else if (engine === nutrimatic) {
+    [min, max, len, fixedText] = captureNutrimaticText(text);
   }
   const charsArray = fixedText.split('');
   charsArray.forEach((character) => {
@@ -233,15 +335,15 @@ function processText(text, engine) {
     nutrimaticText = nutrimaticText.concat('>');
   }
   if (!onelookInvalid) {
-    onelook.input.value = onelookText;
-    onelook.link.href = `https://onelook.com/?ssbp=1&w=${onelookText}`;
+    setInput(onelook, onelookText);
   }
   if (!qatInvalid) {
-    qat.input.value = qatText;
-    qat.link.href = `https://www.quinapalus.com/cgi-bin/qat?pat=${qatText}`;
+    setInput(qat, qatText);
   }
-  nutrimatic.input.value = nutrimaticText;
-  nutrimatic.link.href = `https://nutrimatic.org/?q=${nutrimaticText}`;
+  setInput(nutrimatic, nutrimaticText);
+  if (engine === qat || engine === nutrimatic) {
+    handleLengthRules(min, max, len);
+  }
   setLabelsVisible(false);
   setLinksVisible(true);
   setWarning(onelookInvalid, onelook);
@@ -314,4 +416,33 @@ guessLink.addEventListener('click', (e) => {
       window.open(engine.link.href);
     }
   });
+});
+
+minInput.addEventListener('input', () => {
+  handleLengthRangeInputs();
+});
+
+minInput.onfocus = () => {
+  handleLengthRangeInputs();
+};
+
+maxInput.addEventListener('input', () => {
+  handleLengthRangeInputs();
+});
+
+maxInput.onfocus = () => {
+  handleLengthRangeInputs();
+};
+
+lenInput.addEventListener('input', () => {
+  handleExactLengthInput();
+});
+
+lenInput.onfocus = () => {
+  handleExactLengthInput();
+};
+
+clearLenButton.addEventListener('click', () => {
+  handleLengthRangeRules(null, null);
+  handleExactLengthRules(null);
 });
