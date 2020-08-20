@@ -279,6 +279,7 @@ function inputHandler(engine) {
   // Clear the guess input
   guessInput.value = '';
   guessLabel.style.display = 'none';
+  setGuessType('');
   const text = engine.input.value;
   if (engine.isValidText(text)) {
     processText(text, engine);
