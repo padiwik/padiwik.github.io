@@ -9,7 +9,7 @@ const onelook = {
   input: document.getElementById('onelook'),
   label: document.getElementById('onelookLabel'),
   link: document.getElementById('onelookLink'),
-  isValidText: (text) => text.match(/^[?#@*a-z() ]+$/),
+  isValidText: (text) => text.match(/^[?#@*a-zA-Z() ]+$/),
   name: 'Onelook',
 };
 const qat = {
@@ -80,7 +80,11 @@ function processText(text, engine) {
   let qatInvalid = false;
   let anagramming = false; // true if we are currently in an anagram
   let nestedLevel; // tally of parentheses after qat anagram indicator
-  const charsArray = text.split('');
+  let fixedText = text;
+  if (engine === onelook) {
+    fixedText = text.toLowerCase();
+  }
+  const charsArray = fixedText.split('');
   charsArray.forEach((character) => {
     let onelookAppend;
     let qatAppend;
